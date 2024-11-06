@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,13 +14,17 @@ import (
 	"golang.org/x/net/html"
 )
 
+var safeNames = flag.Bool("safeNames", true, "Convert artist, album, and track names to be safe in filesystems like NTFS")
+
 func main() {
-	if len(os.Args) < 2 {
+	flag.Parse()
+
+	if len(flag.Args()) < 1 {
 		fmt.Println("Usage: bandit-dl <album-url> [<album-url> ...]")
 		return
 	}
 
-	for _, url := range os.Args[1:] {
+	for _, url := range flag.Args() {
 		if err := downloadAlbum(url); err != nil {
 			fmt.Println("❌", err)
 		}
@@ -85,6 +90,14 @@ func downloadAlbum(url string) error {
 
 	if err := json.Unmarshal([]byte(tralbumValue), &tralbum); err != nil {
 		return fmt.Errorf("could not parse album JSON: %w", err)
+	}
+
+	if *safeNames {
+		tralbum.Artist = cleanString(tralbum.Artist)
+		tralbum.Current.Title = cleanString(tralbum.Current.Title)
+		for i, track := range tralbum.Trackinfo {
+			tralbum.Trackinfo[i].Title = cleanString(track.Title)
+		}
 	}
 
 	if tralbum.FreeDownloadPage != "" {
@@ -225,4 +238,29 @@ func getDataValue(n *html.Node, key string) string {
 	}
 
 	return ""
+}
+
+// TODO: Make this user configurable?
+var msStrings = map[rune]rune{
+	'<':  '﹤',
+	'>':  '﹥',
+	':':  'ː',
+	'\'': '“',
+	'/':  '⁄',
+	'\\': '∖',
+	'|':  '⼁',
+	'?':  '﹖',
+	'*':  '﹡',
+}
+
+func cleanString(s string) string {
+	var out string
+	for _, r1 := range s {
+		if r, ok := msStrings[r1]; ok {
+			out += string(r)
+		} else {
+			out += string(r1)
+		}
+	}
+	return out
 }
