@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/bogem/id3v2/v2"
@@ -24,9 +26,25 @@ func main() {
 		return
 	}
 
-	for _, url := range flag.Args() {
-		if err := downloadAlbum(url); err != nil {
+	for _, u := range flag.Args() {
+		parsed, err := url.Parse(u)
+		if err != nil {
 			fmt.Println("❌", err)
+			continue
+		}
+		if parsed.Path == "/" || parsed.Path == "" {
+			parsed.Path = "/music"
+		}
+		if parsed.Path == "/music" || parsed.Path == "/music/" {
+			if err := downloadAlbums(*parsed); err != nil {
+				fmt.Println("❌", err)
+			}
+		} else if strings.HasPrefix(parsed.Path, "/album") {
+			if err := downloadAlbum(u); err != nil {
+				fmt.Println("❌", err)
+			}
+		} else {
+			fmt.Println("❌", "Invalid URL", u)
 		}
 	}
 
@@ -66,16 +84,55 @@ type bandcampTRAlbum struct {
 	} `json:"trackinfo"`
 }
 
-func downloadAlbum(url string) error {
-	resp, err := http.Get(url)
+func downloadAlbums(url url.URL) (err error) {
+	resp, err := http.Get(url.String())
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	doc, err := html.Parse(resp.Body)
 	if err != nil {
-		panic(err)
+		return err
+	}
+
+	els := findElementsWithDataKey(doc, "data-item-id")
+	for _, el := range els {
+		url.Path = ""
+		for c := el.FirstChild; c != nil; c = c.NextSibling {
+			if c.Type == html.TextNode || c.Data != "a" {
+				continue
+			}
+			for _, a := range c.Attr {
+				if a.Key == "href" {
+					url.Path = a.Val
+					break
+				}
+			}
+			if url.Path != "" {
+				break
+			}
+		}
+		if strings.HasPrefix(url.Path, "/album") {
+			if err2 := downloadAlbum(url.String()); err2 != nil {
+				err = fmt.Errorf("%w\n%s", err, err2)
+			}
+		}
+	}
+
+	return err
+}
+
+func downloadAlbum(url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	doc, err := html.Parse(resp.Body)
+	if err != nil {
+		return err
 	}
 
 	el := findElementsWithDataKey(doc, "data-tralbum")
