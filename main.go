@@ -299,10 +299,10 @@ func getDataValue(n *html.Node, key string) string {
 
 // TODO: Make this user configurable?
 var msStrings = map[rune]rune{
-	'<':  '﹤',
-	'>':  '﹥',
-	':':  'ː',
-	'\'': '“',
+	'<': '﹤',
+	'>': '﹥',
+	':': 'ː',
+	//'\'': '“', // This one seems unnecessary.
 	'/':  '⁄',
 	'\\': '∖',
 	'|':  '⼁',
