@@ -197,7 +197,7 @@ func downloadAlbum(url string) error {
 	albumPath := fmt.Sprintf("%s/%s (%s)", tralbum.Artist, tralbum.Current.Title, tralbum.ReleaseDate.Local().Format("2006"))
 
 	if _, err := os.Stat(albumPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(albumPath, 0755); err != nil {
+		if err := os.MkdirAll(albumPath, 0o755); err != nil {
 			return fmt.Errorf("could not create album directory: %w", err)
 		}
 	}
@@ -243,6 +243,7 @@ func downloadAlbum(url string) error {
 		}
 		defer tag.Close()
 
+		tag.SetDefaultEncoding(id3v2.EncodingUTF8)
 		tag.SetArtist(tralbum.Artist)
 		tag.SetAlbum(tralbum.Current.Title)
 		tag.SetYear(tralbum.ReleaseDate.Local().Format("2006"))
@@ -261,7 +262,7 @@ func downloadAlbum(url string) error {
 		}
 
 		if err := tag.Save(); err != nil {
-			return fmt.Errorf("could not save track file: %w", err)
+			return fmt.Errorf("could not save track tags: %w", err)
 		}
 		fmt.Printf("✔️ \n")
 	}
